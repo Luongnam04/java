@@ -1,0 +1,86 @@
+package com.example.auth;
+
+import java.io.IOException;
+import javax.servlet.*;
+import javax.servlet.annotation.*;
+import javax.servlet.http.*;
+import javax.servlet.http.HttpServletResponse;
+
+// === 1. Event Listener ===
+@WebListener
+class SessionListener implements HttpSessionListener {
+    @Override
+    public void sessionCreated(HttpSessionEvent se) {
+        System.out.println("Session được tạo: " + se.getSession().getId());
+    }
+    @Override
+    public void sessionDestroyed(HttpSessionEvent se) {
+        System.out.println("Session bị hủy: " + se.getSession().getId());
+    }
+}
+
+// === 2. Filter kiểm tra username không rỗng ===
+@WebFilter(filterName = "InputFilter", urlPatterns = {"/login"})
+class InputFilter implements Filter {
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+        String user = request.getParameter("username");
+        if (user == null || user.trim().isEmpty()) {
+            ((HttpServletResponse)response)
+                .sendRedirect(request.getServletContext().getContextPath()
+                              + "/?error=Username+không+được+rỗng");
+            return;
+        }
+        chain.doFilter(request, response);
+    }
+}
+
+// === 3. Main Servlet kiêm luôn cả hiển thị form & xử lý login ===
+@WebServlet(urlPatterns = {"/", "/login"})
+public class AuthApp extends HttpServlet {
+    private static final String USER = "admin", PASS = "123";
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        // In form login, và hiển thị error nếu có
+        String error = req.getParameter("error");
+        resp.setContentType("text/html; charset=UTF-8");
+        resp.getWriter().write(
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Login</title></head><body>"
+          + "<h2>Đăng nhập</h2>"
+          + (error != null ? "<p style='color:red;'>" + error + "</p>" : "")
+          + "<form method='post' action='login'>"
+          + "Username: <input name='username'/><br/><br/>"
+          + "Password: <input type='password' name='password'/><br/><br/>"
+          + "<button>Login</button></form>"
+          + "</body></html>"
+        );
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        String u = req.getParameter("username"),
+               p = req.getParameter("password");
+        boolean ok = USER.equals(u) && PASS.equals(p);
+
+        // Nếu thành công, tạo session
+        if (ok) {
+            req.getSession(true).setAttribute("user", u);
+        }
+
+        // In kết quả
+        resp.setContentType("text/html; charset=UTF-8");
+        resp.getWriter().write(
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Result</title></head><body>"
+          + "<h2>Kết quả đăng nhập</h2>"
+          + (ok
+             ? "<p style='color:green;'>Đăng nhập thành công! Chào " + u + ".</p>"
+             : "<p style='color:red;'>Sai tên đăng nhập hoặc mật khẩu.</p>")
+          + "<p><a href='./'>Quay lại</a></p>"
+          + "</body></html>"
+        );
+    }
+}
